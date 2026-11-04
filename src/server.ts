@@ -2,6 +2,7 @@ import app from "./app.js";
 import { env } from "./config/env.js";
 import { prisma } from "./lib/prisma.js";
 import { seedDefaultAdmin } from "./modules/admin/admin.service.js";
+import { seedStandardClasses } from "./modules/class/class.service.js";
 
 async function startServer() {
   try {
@@ -11,10 +12,14 @@ async function startServer() {
     // Seed default admin if none exists
     await seedDefaultAdmin();
 
+    // Seed standard academic classes and boards if not present
+    await seedStandardClasses();
+
     const server = app.listen(env.PORT, () => {
       console.log(`StudyNest API: http://localhost:${env.PORT}`);
       console.log(`Health check: http://localhost:${env.PORT}/api/v1/health`);
-      console.log(`Admin Auth: http://localhost:${env.PORT}/api/v1/admin/auth`);
+      console.log(`Classes API: http://localhost:${env.PORT}/api/v1/classes`);
+      console.log(`Boards API: http://localhost:${env.PORT}/api/v1/classes/boards`);
       console.log(`Environment: ${env.NODE_ENV}`);
     });
 

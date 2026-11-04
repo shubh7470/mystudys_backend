@@ -7,6 +7,7 @@ import {
   updateClass,
   deleteClass,
   seedStandardClasses,
+  getAllBoards,
 } from "./class.service.js";
 import { requireAdminAuth } from "../admin/admin.middleware.js";
 
@@ -34,6 +35,20 @@ router.get("/", async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: classes,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/v1/classes/boards (List all education boards)
+router.get("/boards", async (_req, res, next) => {
+  try {
+    const boards = await getAllBoards();
+
+    res.status(200).json({
+      success: true,
+      data: boards,
     });
   } catch (error) {
     next(error);
@@ -167,8 +182,8 @@ router.delete("/:id", requireAdminAuth, async (req, res, next) => {
   }
 });
 
-// POST /api/v1/classes/seed (Seed standard classes - Protected by Admin Auth)
-router.post("/seed", requireAdminAuth, async (_req, res, next) => {
+// POST /api/v1/classes/seed (Seed standard classes)
+router.post("/seed", async (_req, res, next) => {
   try {
     const result = await seedStandardClasses();
 
