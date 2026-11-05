@@ -12,16 +12,16 @@ export interface CreateMaterialGroupInput {
   isPublished?: boolean;
 }
 
-export interface CreateMaterialHeadingInput {
+export interface CreateMaterialBookInput {
   groupId: string;
   title: string;
-  medium: "English" | "Hindi" | string;
+  medium?: "English" | "Hindi" | string;
   displayOrder?: number;
 }
 
 export interface CreateMaterialInput {
   groupId?: string;
-  headingId?: string;
+  bookId?: string;
   title: string;
   description?: string;
   fileUrl: string;
@@ -39,7 +39,7 @@ export interface CreateMaterialInput {
 
 export interface MaterialFilter {
   groupId?: string;
-  headingId?: string;
+  bookId?: string;
   className?: string;
   stream?: string;
   board?: string;
@@ -48,7 +48,7 @@ export interface MaterialFilter {
   search?: string;
 }
 
-// ----------------- GROUPS -----------------
+// ======================== BOOK GROUPS ========================
 
 export async function createMaterialGroup(data: CreateMaterialGroupInput) {
   return prisma.materialGroup.create({
@@ -64,7 +64,7 @@ export async function createMaterialGroup(data: CreateMaterialGroupInput) {
       isPublished: data.isPublished ?? true,
     },
     include: {
-      headings: {
+      books: {
         include: {
           materials: true,
         },
@@ -102,7 +102,7 @@ export async function getAllMaterialGroups(filter: {
     where,
     orderBy: [{ displayOrder: "asc" }, { createdAt: "desc" }],
     include: {
-      headings: {
+      books: {
         include: {
           materials: {
             orderBy: { createdAt: "desc" },
@@ -121,7 +121,7 @@ export async function getMaterialGroupById(id: string) {
   return prisma.materialGroup.findUnique({
     where: { id },
     include: {
-      headings: {
+      books: {
         include: {
           materials: {
             orderBy: { createdAt: "desc" },
@@ -139,7 +139,6 @@ export async function getMaterialGroupById(id: string) {
 export async function deleteMaterialGroup(id: string) {
   const existing = await prisma.materialGroup.findUnique({
     where: { id },
-    include: { materials: true },
   });
 
   if (!existing) {
@@ -151,14 +150,15 @@ export async function deleteMaterialGroup(id: string) {
   });
 }
 
-// ----------------- HEADINGS -----------------
+// ======================== BOOKS ========================
 
-export async function createMaterialHeading(data: CreateMaterialHeadingInput) {
-  return prisma.materialHeading.create({
+export async function createMaterialBook(data: CreateMaterialBookInput) {
+  const medium = data.medium && data.medium.toLowerCase().includes("h") ? "Hindi" : "English";
+  return prisma.materialBook.create({
     data: {
       groupId: data.groupId,
       title: data.title.trim(),
-      medium: data.medium ? data.medium.trim() : "English",
+      medium,
       displayOrder: data.displayOrder ?? 0,
     },
     include: {
@@ -167,28 +167,57 @@ export async function createMaterialHeading(data: CreateMaterialHeadingInput) {
   });
 }
 
-export async function deleteMaterialHeading(id: string) {
-  const existing = await prisma.materialHeading.findUnique({
+export async function getMaterialBooksByGroupId(groupId: string, medium?: string) {
+  const where: any = { groupId };
+  if (medium) {
+    const isHindi = medium.toLowerCase().includes("h");
+    where.medium = isHindi ? "Hindi" : "English";
+  }
+
+  return prisma.materialBook.findMany({
+    where,
+    orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+    include: {
+      materials: {
+        orderBy: { createdAt: "desc" },
+      },
+    },
+  });
+}
+
+export async function getMaterialBookById(id: string) {
+  return prisma.materialBook.findUnique({
     where: { id },
-    include: { materials: true },
+    include: {
+      group: true,
+      materials: {
+        orderBy: { createdAt: "desc" },
+      },
+    },
+  });
+}
+
+export async function deleteMaterialBook(id: string) {
+  const existing = await prisma.materialBook.findUnique({
+    where: { id },
   });
 
   if (!existing) {
-    throw new Error("HEADING_NOT_FOUND");
+    throw new Error("BOOK_NOT_FOUND");
   }
 
-  return prisma.materialHeading.delete({
+  return prisma.materialBook.delete({
     where: { id },
   });
 }
 
-// ----------------- MATERIALS -----------------
+// ======================== MATERIALS (PDFs) ========================
 
 export async function createMaterial(data: CreateMaterialInput) {
   return prisma.studyMaterial.create({
     data: {
       groupId: data.groupId || null,
-      headingId: data.headingId || null,
+      bookId: data.bookId || null,
       title: data.title.trim(),
       description: data.description?.trim() || null,
       fileUrl: data.fileUrl.trim(),
@@ -205,7 +234,7 @@ export async function createMaterial(data: CreateMaterialInput) {
     },
     include: {
       group: true,
-      heading: true,
+      book: true,
     },
   });
 }
@@ -216,8 +245,8 @@ export async function getAllMaterials(filter: MaterialFilter = {}) {
   if (filter.groupId) {
     where.groupId = filter.groupId;
   }
-  if (filter.headingId) {
-    where.headingId = filter.headingId;
+  if (filter.bookId) {
+    where.bookId = filter.bookId;
   }
   if (filter.className) {
     where.className = filter.className;
@@ -247,7 +276,7 @@ export async function getAllMaterials(filter: MaterialFilter = {}) {
     orderBy: { createdAt: "desc" },
     include: {
       group: true,
-      heading: true,
+      book: true,
     },
   });
 }
@@ -257,7 +286,7 @@ export async function getMaterialById(id: string) {
     where: { id },
     include: {
       group: true,
-      heading: true,
+      book: true,
     },
   });
 }

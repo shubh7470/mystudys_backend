@@ -72,58 +72,6 @@ model AcademicClass {
   @@map("academic_classes")
 }
 
-model MaterialCategory {
-  id           String   @id @default(uuid()) @db.Uuid
-  title        String
-  icon         String?
-  className    String   @map("class_name")
-  stream       String?
-  board        String   @default("CBSE")
-  displayOrder Int      @default(0) @map("display_order")
-  isPublished  Boolean  @default(true) @map("is_published")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  books        MaterialBook[]
-
-  @@index([className])
-  @@index([stream])
-  @@index([board])
-  @@map("material_categories")
-}
-
-model MaterialBook {
-  id           String   @id @default(uuid()) @db.Uuid
-  categoryId   String   @map("category_id") @db.Uuid
-  title        String
-  medium       String   @default("English") // "English" | "Hindi"
-  displayOrder Int      @default(0) @map("display_order")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  category     MaterialCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  chapters     MaterialChapter[]
-
-  @@index([categoryId])
-  @@index([medium])
-  @@map("material_books")
-}
-
-model MaterialChapter {
-  id           String   @id @default(uuid()) @db.Uuid
-  bookId       String   @map("book_id") @db.Uuid
-  title        String
-  displayOrder Int      @default(0) @map("display_order")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  book         MaterialBook    @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  materials    StudyMaterial[]
-
-  @@index([bookId])
-  @@map("material_chapters")
-}
-
 model MaterialGroup {
   id           String   @id @default(uuid()) @db.Uuid
   title        String
@@ -139,7 +87,7 @@ model MaterialGroup {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   academicClass AcademicClass?   @relation(fields: [classId], references: [id], onDelete: SetNull)
-  headings      MaterialHeading[]
+  books         MaterialBook[]
   materials     StudyMaterial[]
 
   @@index([className])
@@ -148,7 +96,7 @@ model MaterialGroup {
   @@map("material_groups")
 }
 
-model MaterialHeading {
+model MaterialBook {
   id           String   @id @default(uuid()) @db.Uuid
   groupId      String   @map("group_id") @db.Uuid
   title        String
@@ -157,26 +105,24 @@ model MaterialHeading {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  group     MaterialGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  materials StudyMaterial[]
+  group        MaterialGroup    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  materials    StudyMaterial[]
 
   @@index([groupId])
   @@index([medium])
-  @@map("material_headings")
+  @@map("material_books")
 }
 
 model StudyMaterial {
   id          String   @id @default(uuid()) @db.Uuid
   groupId     String?  @map("group_id") @db.Uuid
-  headingId   String?  @map("heading_id") @db.Uuid
-  chapterId   String?  @map("chapter_id") @db.Uuid
+  bookId      String?  @map("book_id") @db.Uuid
 
   title       String
   description String?
   fileUrl     String   @map("file_url")
   fileName    String?  @map("file_name")
   fileSize    Int?     @map("file_size")
-  badgeColor  String?  @default("red") @map("badge_color")
 
   classId     String?  @map("class_id") @db.Uuid
   className   String   @map("class_name")
@@ -193,12 +139,10 @@ model StudyMaterial {
 
   academicClass AcademicClass?   @relation(fields: [classId], references: [id], onDelete: SetNull)
   group         MaterialGroup?   @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  heading       MaterialHeading? @relation(fields: [headingId], references: [id], onDelete: Cascade)
-  chapter       MaterialChapter? @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  book          MaterialBook?    @relation(fields: [bookId], references: [id], onDelete: Cascade)
 
   @@index([groupId])
-  @@index([headingId])
-  @@index([chapterId])
+  @@index([bookId])
   @@index([className])
   @@index([stream])
   @@index([board])

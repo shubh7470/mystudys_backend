@@ -6,25 +6,15 @@ import {
   getAllMaterialGroups,
   getMaterialGroupById,
   deleteMaterialGroup,
-  createMaterialHeading,
-  deleteMaterialHeading,
+  createMaterialBook,
+  getMaterialBooksByGroupId,
+  getMaterialBookById,
+  deleteMaterialBook,
   createMaterial,
   getAllMaterials,
   getMaterialById,
   deleteMaterial,
 } from "./material.service.js";
-import {
-  getCategories,
-  createCategory,
-  deleteCategory,
-  getBooks,
-  createBook,
-  deleteBook,
-  getChapters,
-  createChapter,
-  deleteChapter,
-  createChapterMaterial,
-} from "./selfstudy.service.js";
 import { uploadToR2, deleteFromR2 } from "../../lib/r2.js";
 
 const router = Router();
@@ -55,16 +45,16 @@ const createGroupSchema = z.object({
   isPublished: z.boolean().default(true),
 });
 
-const createHeadingSchema = z.object({
+const createBookSchema = z.object({
   groupId: z.string().uuid("Valid groupId is required"),
-  title: z.string().min(1, "Heading title is required"),
+  title: z.string().min(1, "Book title is required"),
   medium: z.enum(["English", "Hindi"]).default("English"),
   displayOrder: z.coerce.number().optional(),
 });
 
 const createMaterialSchema = z.object({
   groupId: z.string().uuid().optional(),
-  headingId: z.string().uuid().optional(),
+  bookId: z.string().uuid().optional(),
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   fileUrl: z.string().min(1, "File URL is required"),
@@ -80,9 +70,9 @@ const createMaterialSchema = z.object({
   isPublished: z.boolean().default(true),
 });
 
-// ======================== GROUPS ENDPOINTS ========================
+// ======================== BOOK GROUPS ENDPOINTS ========================
 
-// POST /api/v1/materials/groups (Create a new Group)
+// POST /api/v1/materials/groups (Create a new Book Group)
 router.post("/groups", async (req, res, next) => {
   const parsed = createGroupSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -97,7 +87,7 @@ router.post("/groups", async (req, res, next) => {
     const group = await createMaterialGroup(parsed.data);
     res.status(201).json({
       success: true,
-      message: "Material group created successfully",
+      message: "Book group created successfully",
       data: group,
     });
   } catch (error) {
@@ -105,7 +95,7 @@ router.post("/groups", async (req, res, next) => {
   }
 });
 
-// GET /api/v1/materials/groups (List Groups with filters)
+// GET /api/v1/materials/groups (List Book Groups with filters)
 router.get("/groups", async (req, res, next) => {
   try {
     const { className, stream, board, search } = req.query;
@@ -125,7 +115,7 @@ router.get("/groups", async (req, res, next) => {
   }
 });
 
-// GET /api/v1/materials/groups/:id (Get single group with headings & materials)
+// GET /api/v1/materials/groups/:id (Get single group with its books & materials)
 router.get("/groups/:id", async (req, res, next) => {
   try {
     const id = req.params.id as string;
@@ -134,7 +124,7 @@ router.get("/groups/:id", async (req, res, next) => {
     if (!group) {
       res.status(404).json({
         success: false,
-        message: "Material group not found",
+        message: "Book group not found",
       });
       return;
     }
@@ -148,7 +138,7 @@ router.get("/groups/:id", async (req, res, next) => {
   }
 });
 
-// DELETE /api/v1/materials/groups/:id (Delete a group)
+// DELETE /api/v1/materials/groups/:id (Delete a Book Group)
 router.delete("/groups/:id", async (req, res, next) => {
   try {
     const id = req.params.id as string;
@@ -156,14 +146,14 @@ router.delete("/groups/:id", async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: "Material group deleted successfully",
+      message: "Book group deleted successfully",
     });
   } catch (error: unknown) {
     const err = error as Error;
     if (err.message === "GROUP_NOT_FOUND") {
       res.status(404).json({
         success: false,
-        message: "Material group not found",
+        message: "Book group not found",
       });
       return;
     }
@@ -171,47 +161,86 @@ router.delete("/groups/:id", async (req, res, next) => {
   }
 });
 
-// ======================== HEADINGS ENDPOINTS ========================
+// ======================== BOOKS ENDPOINTS ========================
 
-// POST /api/v1/materials/headings (Create a Heading under a Group)
-router.post("/headings", async (req, res, next) => {
-  const parsed = createHeadingSchema.safeParse(req.body);
+// POST /api/v1/materials/books (Create a Book inside a Group)
+router.post("/books", async (req, res, next) => {
+  const parsed = createBookSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
       success: false,
-      message: parsed.error.issues[0]?.message || "Invalid heading data",
+      message: parsed.error.issues[0]?.message || "Invalid book data",
     });
     return;
   }
 
   try {
-    const heading = await createMaterialHeading(parsed.data);
+    const book = await createMaterialBook(parsed.data);
     res.status(201).json({
       success: true,
-      message: "Heading created successfully",
-      data: heading,
+      message: "Book created successfully",
+      data: book,
     });
   } catch (error) {
     next(error);
   }
 });
 
-// DELETE /api/v1/materials/headings/:id (Delete a heading)
-router.delete("/headings/:id", async (req, res, next) => {
+// GET /api/v1/materials/groups/:groupId/books (List books inside a group)
+router.get("/groups/:groupId/books", async (req, res, next) => {
   try {
-    const id = req.params.id as string;
-    await deleteMaterialHeading(id);
+    const groupId = req.params.groupId as string;
+    const { medium } = req.query;
+    const books = await getMaterialBooksByGroupId(groupId, medium as string | undefined);
 
     res.status(200).json({
       success: true,
-      message: "Heading deleted successfully",
+      data: books,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/v1/materials/books/:id (Get single book with its PDFs)
+router.get("/books/:id", async (req, res, next) => {
+  try {
+    const id = req.params.id as string;
+    const book = await getMaterialBookById(id);
+
+    if (!book) {
+      res.status(404).json({
+        success: false,
+        message: "Book not found",
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: book,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/v1/materials/books/:id (Delete a book)
+router.delete("/books/:id", async (req, res, next) => {
+  try {
+    const id = req.params.id as string;
+    await deleteMaterialBook(id);
+
+    res.status(200).json({
+      success: true,
+      message: "Book deleted successfully",
     });
   } catch (error: unknown) {
     const err = error as Error;
-    if (err.message === "HEADING_NOT_FOUND") {
+    if (err.message === "BOOK_NOT_FOUND") {
       res.status(404).json({
         success: false,
-        message: "Heading not found",
+        message: "Book not found",
       });
       return;
     }
@@ -219,7 +248,7 @@ router.delete("/headings/:id", async (req, res, next) => {
   }
 });
 
-// ======================== MATERIALS UPLOAD & CRUD ========================
+// ======================== MATERIALS (PDFs) UPLOAD & CRUD ========================
 
 // POST /api/v1/materials/upload (Upload single PDF file directly to Cloudflare R2)
 router.post("/upload", upload.single("file"), async (req, res) => {
@@ -262,11 +291,11 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 // GET /api/v1/materials (List materials with filters)
 router.get("/", async (req, res, next) => {
   try {
-    const { groupId, headingId, className, stream, board, medium, type, search } = req.query;
+    const { groupId, bookId, className, stream, board, medium, type, search } = req.query;
 
     const materials = await getAllMaterials({
       groupId: groupId as string | undefined,
-      headingId: headingId as string | undefined,
+      bookId: bookId as string | undefined,
       className: className as string | undefined,
       stream: stream as string | undefined,
       board: board as string | undefined,
@@ -367,169 +396,6 @@ router.delete("/:id", async (req, res, next) => {
       return;
     }
 
-    next(error);
-  }
-});
-
-// ======================== SELFSTUDY HIERARCHY ENDPOINTS ========================
-
-// GET /api/v1/materials/categories (Categories for Class & Board)
-router.get("/categories", async (req, res, next) => {
-  try {
-    const { className, board, stream } = req.query;
-    const categories = await getCategories({
-      className: className as string | undefined,
-      board: board as string | undefined,
-      stream: stream as string | undefined,
-    });
-
-    res.status(200).json({
-      success: true,
-      data: categories,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// POST /api/v1/materials/categories (Create custom category)
-router.post("/categories", async (req, res, next) => {
-  try {
-    const category = await createCategory(req.body);
-    res.status(201).json({
-      success: true,
-      data: category,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// DELETE /api/v1/materials/categories/:id
-router.delete("/categories/:id", async (req, res, next) => {
-  try {
-    const id = req.params.id as string;
-    await deleteCategory(id);
-    res.status(200).json({ success: true, message: "Category deleted" });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// GET /api/v1/materials/categories/:categoryId/books (Books under category with E.M / H.M filtering)
-router.get("/categories/:categoryId/books", async (req, res, next) => {
-  try {
-    const categoryId = req.params.categoryId as string;
-    const { medium } = req.query;
-    const books = await getBooks(categoryId, medium as string | undefined);
-
-    res.status(200).json({
-      success: true,
-      data: books,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// POST /api/v1/materials/categories/:categoryId/books (Create book under category)
-router.post("/categories/:categoryId/books", async (req, res, next) => {
-  try {
-    const categoryId = req.params.categoryId as string;
-    const book = await createBook({
-      categoryId,
-      title: req.body.title,
-      medium: req.body.medium,
-      displayOrder: req.body.displayOrder,
-    });
-
-    res.status(201).json({
-      success: true,
-      data: book,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// DELETE /api/v1/materials/books/:id
-router.delete("/books/:id", async (req, res, next) => {
-  try {
-    const id = req.params.id as string;
-    await deleteBook(id);
-    res.status(200).json({ success: true, message: "Book deleted" });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// GET /api/v1/materials/books/:bookId/chapters (Chapters & PDFs under book)
-router.get("/books/:bookId/chapters", async (req, res, next) => {
-  try {
-    const bookId = req.params.bookId as string;
-    const chapters = await getChapters(bookId);
-
-    res.status(200).json({
-      success: true,
-      data: chapters,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// POST /api/v1/materials/books/:bookId/chapters (Create chapter)
-router.post("/books/:bookId/chapters", async (req, res, next) => {
-  try {
-    const bookId = req.params.bookId as string;
-    const chapter = await createChapter({
-      bookId,
-      title: req.body.title,
-      displayOrder: req.body.displayOrder,
-    });
-
-    res.status(201).json({
-      success: true,
-      data: chapter,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// DELETE /api/v1/materials/chapters/:id
-router.delete("/chapters/:id", async (req, res, next) => {
-  try {
-    const id = req.params.id as string;
-    await deleteChapter(id);
-    res.status(200).json({ success: true, message: "Chapter deleted" });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// POST /api/v1/materials/chapters/:chapterId/materials (Add PDF to chapter)
-router.post("/chapters/:chapterId/materials", async (req, res, next) => {
-  try {
-    const chapterId = req.params.chapterId as string;
-    const material = await createChapterMaterial({
-      chapterId,
-      title: req.body.title || "Basic PDF",
-      fileUrl: req.body.fileUrl,
-      fileName: req.body.fileName,
-      fileSize: req.body.fileSize,
-      badgeColor: req.body.badgeColor,
-      className: req.body.className || "Class 12th",
-      board: req.body.board || "CBSE",
-      stream: req.body.stream,
-      medium: req.body.medium,
-    });
-
-    res.status(201).json({
-      success: true,
-      data: material,
-    });
-  } catch (error) {
     next(error);
   }
 });
